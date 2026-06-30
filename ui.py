@@ -1,9 +1,15 @@
 import customtkinter as ctk
 import threading
-from tkinter import filedialog
-from core.installer import Installer
-from tkinter import messagebox
+import requests
+import webbrowser
 import os
+
+from tkinter import filedialog, messagebox
+from core.installer import Installer
+
+
+APP_VERSION = "1.0.0"
+
 
 class LauncherUI:
 
@@ -22,6 +28,9 @@ class LauncherUI:
 
         self.crear_interfaz()
 
+    # =========================
+    # UI
+    # =========================
     def crear_interfaz(self):
 
         self.left = ctk.CTkFrame(self.app, width=220, corner_radius=0)
@@ -66,50 +75,88 @@ class LauncherUI:
         )
         self.select_btn.grid(row=0, column=1, padx=10)
 
+        self.update_btn = ctk.CTkButton(
+            botones,
+            text="Buscar actualización",
+            width=220,
+            command=self.check_update
+        )
+        self.update_btn.grid(row=0, column=2, padx=10)
+
     # =========================
-    # selección carpeta
+    # SELECCION CARPETA
     # =========================
     def seleccionar_carpeta(self):
 
-        # 🔥 aviso importante antes de abrir selector
         messagebox.showinfo(
             "IMPORTANTE",
-            "Selecciona la carpeta donde se encuentra la carpeta mods\n\nNO selecciones la carpeta mods."
+            "Selecciona la carpeta .minecraft (NO la carpeta mods)"
         )
 
-        folder = filedialog.askdirectory(
-            title="Selecciona tu carpeta .minecraft"
-        )
+        folder = filedialog.askdirectory(title="Selecciona tu carpeta .minecraft")
 
         if not folder:
             return
 
-        # 🔥 validación básica
         mods_path = os.path.join(folder, "mods")
 
         if not os.path.exists(mods_path):
             messagebox.showwarning(
                 "Carpeta incorrecta",
-                "Esta carpeta no parece ser .minecraft\n\nDebe contener la carpeta 'mods'."
+                "No parece ser .minecraft (falta carpeta mods)"
             )
             return
 
-        # guardar ruta
         self.minecraft_path = folder
         self.installer.set_custom_minecraft(folder)
 
         self.estado.configure(text="🟡 Ruta personalizada")
-
         self.log.insert("end", f"\n📁 .minecraft seleccionado:\n{folder}\n")
+
+    # =========================
+    # UPDATE SYSTEM
+    # =========================
+    def check_update(self):
+
+        def _check():
+
+            try:
+                url = "https://raw.githubusercontent.com/JordiMarrufo/Launcher-minecraft-mod/main/version.json"
+                r = requests.get(url, timeout=10)
+                data = r.json()
+
+                latest = data["version"]
+
+                if latest != APP_VERSION:
+
+                    self.log.insert("end", f"\n🟡 Nueva versión: {latest}\n")
+
+                    messagebox.showinfo(
+                        "Actualización disponible",
+                        f"Versión nueva: {latest}\nTu versión: {APP_VERSION}"
+                    )
+
+                    webbrowser.open(data["url"])
+
+                else:
+                    messagebox.showinfo(
+                        "Actualización",
+                        "Ya tienes la última versión"
+                    )
+
+            except Exception as e:
+                messagebox.showerror("Error update", str(e))
+
+        threading.Thread(target=_check).start()
+
     # =========================
     # THREAD FIX
     # =========================
     def iniciar_instalacion(self):
-        thread = threading.Thread(target=self.instalar)
-        thread.start()
+        threading.Thread(target=self.instalar).start()
 
     # =========================
-    # INSTALAR
+    # INSTALAR MODS
     # =========================
     def instalar(self):
 
@@ -117,7 +164,6 @@ class LauncherUI:
         self.progress.set(0)
 
         self.log.insert("end", "🔍 Buscando Minecraft...\n")
-        self.app.update()
 
         carpeta = self.installer.buscar_minecraft()
 
@@ -126,10 +172,8 @@ class LauncherUI:
             return
 
         self.log.insert("end", f"📂 {carpeta}\n\n")
-        self.app.update()
 
         self.log.insert("end", "📡 Descargando modpack...\n")
-        self.app.update()
 
         url_json = "https://raw.githubusercontent.com/JordiMarrufo/Mods-1.20.1/main/modpack.json"
         data = self.installer.descargar_modpack(url_json)
@@ -142,7 +186,6 @@ class LauncherUI:
         total = len(mods)
 
         self.log.insert("end", f"📦 Instalando {total} mods...\n\n")
-        self.app.update()
 
         ok, result = self.installer.instalar_mods(data)
 
@@ -150,15 +193,18 @@ class LauncherUI:
             self.log.insert("end", f"❌ {result}\n")
             return
 
-        # 🔥 AQUÍ EL PROGRESO REAL
+        # progreso visual seguro
         for i in range(total):
 
             self.log.insert("end", f"✔ {i+1}/{total} instalado\n")
             self.progress.set((i + 1) / total)
+            self.app.update()
 
-            self.app.update()   # 👈 clave para ver en vivo
-
-        self.log.insert("end", "\n🎉 Instalación completada\n")
         self.estado.configure(text="🟢 Instalado")
+        self.log.insert("end", "\n🎉 Instalación completada\n")
+
+    # =========================
+    # START
+    # =========================
     def iniciar(self):
         self.app.mainloop()
