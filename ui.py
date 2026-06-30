@@ -3,12 +3,54 @@ import threading
 import requests
 import webbrowser
 import os
+import tkinter.font as tkfont
 from core.updater import Updater
 from tkinter import filedialog, messagebox
 from core.installer import Installer
 
 
-APP_VERSION = "1.0.3"  # Actualiza esta versión según corresponda
+APP_VERSION = "1.0.4"  # Actualiza esta versión según corresponda
+
+
+# =====================================================
+# PALETA DE COLORES ESTILO MINECRAFT
+# =====================================================
+class MCColors:
+    BG_STONE      = "#262626"   # fondo general (piedra oscura)
+    PANEL_DIRT    = "#3A2E22"   # panel lateral (tierra)
+    PANEL_STONE   = "#2F2F2F"   # panel derecho (piedra)
+    GRASS_TOP     = "#5D8A3A"   # franja superior tipo bloque de pasto
+    GRASS_DARK    = "#3F5F28"
+    WOOD          = "#7A5230"   # marcos tipo madera
+    WOOD_DARK     = "#4F341C"
+
+    BUTTON_FACE   = "#8B8B8B"   # gris botón clásico de Minecraft GUI
+    BUTTON_HOVER  = "#A6A6A6"
+    BUTTON_PRESS  = "#6E6E6E"
+    BUTTON_BORDER = "#1E1E1E"
+
+    TEXT_WHITE    = "#FFFFFF"
+    TEXT_GRAY     = "#C6C6C6"
+    TEXT_YELLOW   = "#FFFF55"   # texto "encantado" / títulos
+    TEXT_GREEN    = "#55FF55"
+    TEXT_RED      = "#FF5555"
+
+    LOG_BG        = "#0A0A0A"
+    PROGRESS_BG   = "#1A1A1A"
+    PROGRESS_FILL = "#55AA00"   # verde barra de experiencia
+    PROGRESS_BORDER = "#000000"
+
+
+def pixel_font(size=14, bold=True):
+    """Intenta usar una fuente tipo pixel-art si está instalada,
+    si no, recurre a una monoespaciada en negrita que da un aire
+    'bloque' similar al de Minecraft."""
+    preferred = ["Minecraftia", "Press Start 2P", "04b03", "Pixel Emulator"]
+    installed = set(tkfont.families())
+    for name in preferred:
+        if name in installed:
+            return (name, size)
+    return ("Consolas", size, "bold" if bold else "normal")
 
 
 class LauncherUI:
@@ -22,6 +64,8 @@ class LauncherUI:
         self.app.title("Last Hope - Launcher - Mods")
         self.app.geometry("1000x600")
         self.app.resizable(False, False)
+        self.app.configure(fg_color=MCColors.BG_STONE)
+
         self.updater = Updater()
         self.minecraft_path = None
         self.installer = Installer()
@@ -33,63 +77,142 @@ class LauncherUI:
     # =========================
     def crear_interfaz(self):
 
-        self.left = ctk.CTkFrame(self.app, width=220, corner_radius=0)
+        # ---------- SIDEBAR (estilo "tierra" con franja de "pasto") ----------
+        self.left = ctk.CTkFrame(
+            self.app, width=220, corner_radius=0,
+            fg_color=MCColors.PANEL_DIRT,
+            border_width=4, border_color=MCColors.WOOD_DARK
+        )
         self.left.pack(side="left", fill="y")
+        self.left.pack_propagate(False)
+
+        # franja superior tipo "bloque de pasto"
+        grass_strip = ctk.CTkFrame(
+            self.left, height=14, corner_radius=0,
+            fg_color=MCColors.GRASS_TOP
+        )
+        grass_strip.pack(fill="x", side="top")
+
+        # Título con efecto de "sombra" tipo letras de Minecraft
+        title_container = ctk.CTkFrame(self.left, fg_color="transparent")
+        title_container.pack(pady=(40, 10), padx=10)
+
+        shadow = ctk.CTkLabel(
+            title_container,
+            text="MODS\nINSTALLER\nLAST HOPE",
+            font=pixel_font(20, True),
+            text_color=MCColors.WOOD_DARK,
+            justify="center"
+        )
+        shadow.place(x=3, y=3)
+
+        ctk.CTkLabel(
+            title_container,
+            text="MODS\nINSTALLER\nLAST HOPE",
+            font=pixel_font(20, True),
+            text_color=MCColors.TEXT_YELLOW,
+            justify="center"
+        ).pack()
 
         ctk.CTkLabel(
             self.left,
-            text="MINECRAFT\nINSTALLER",
-            font=("Segoe UI", 24, "bold")
-        ).pack(pady=40)
+            text=f"v{APP_VERSION}",
+            font=pixel_font(12, False),
+            text_color=MCColors.TEXT_GRAY
+        ).pack(pady=(0, 30))
 
-        self.right = ctk.CTkFrame(self.app)
+        # bloque decorativo inferior (simula textura de tierra apilada)
+        deco = ctk.CTkFrame(self.left, fg_color=MCColors.WOOD, height=8, corner_radius=0)
+        deco.pack(side="bottom", fill="x")
+
+        # ---------- PANEL DERECHO (estilo "piedra") ----------
+        self.right = ctk.CTkFrame(
+            self.app, fg_color=MCColors.PANEL_STONE, corner_radius=0,
+            border_width=4, border_color=MCColors.BUTTON_BORDER
+        )
         self.right.pack(side="right", fill="both", expand=True, padx=15, pady=15)
 
-        self.estado = ctk.CTkLabel(self.right, text="🟢 Esperando", font=("Segoe UI", 18))
-        self.estado.pack(anchor="w", pady=(20, 10))
+        self.estado = ctk.CTkLabel(
+            self.right, text="🟢 Esperando",
+            font=pixel_font(16, True),
+            text_color=MCColors.TEXT_GREEN
+        )
+        self.estado.pack(anchor="w", padx=20, pady=(20, 10))
 
-        self.progress = ctk.CTkProgressBar(self.right, width=650)
-        self.progress.pack(pady=10)
+        # ---------- BARRA DE PROGRESO (estilo barra de experiencia) ----------
+        progress_frame = ctk.CTkFrame(
+            self.right, fg_color=MCColors.PROGRESS_BORDER,
+            corner_radius=0, border_width=2, border_color=MCColors.BUTTON_BORDER
+        )
+        progress_frame.pack(padx=20, pady=10, fill="x")
+
+        self.progress = ctk.CTkProgressBar(
+            progress_frame, width=650, height=18,
+            corner_radius=0,
+            fg_color=MCColors.PROGRESS_BG,
+            progress_color=MCColors.PROGRESS_FILL
+        )
+        self.progress.pack(padx=4, pady=4, fill="x")
         self.progress.set(0)
 
-        self.log = ctk.CTkTextbox(self.right, width=700, height=320)
-        self.log.pack(pady=20)
-        self.log.insert("end", "Bienvenido\n")
+        # ---------- CONSOLA / LOG (estilo chat de Minecraft) ----------
+        self.log = ctk.CTkTextbox(
+            self.right, width=700, height=320,
+            corner_radius=0,
+            fg_color=MCColors.LOG_BG,
+            text_color=MCColors.TEXT_WHITE,
+            font=("Consolas", 13),
+            border_width=2, border_color=MCColors.BUTTON_BORDER
+        )
+        self.log.pack(padx=20, pady=20, fill="both", expand=True)
+        self.log.insert("end", "§a[Sistema]§r Bienvenido a Last Hope Mods Installer\n")
 
+        # ---------- BOTONES (estilo botón clásico de menú de Minecraft) ----------
         botones = ctk.CTkFrame(self.right, fg_color="transparent")
-        botones.pack(pady=10)
+        botones.pack(pady=(0, 20))
+
+        btn_kwargs = dict(
+            corner_radius=0,
+            fg_color=MCColors.BUTTON_FACE,
+            hover_color=MCColors.BUTTON_HOVER,
+            text_color=MCColors.TEXT_WHITE,
+            font=pixel_font(13, True),
+            border_width=3,
+            border_color=MCColors.BUTTON_BORDER,
+            width=170,
+            height=40
+        )
 
         self.install_btn = ctk.CTkButton(
-            botones,
-            text="Instalar Mods",
-            width=220,
-            command=self.iniciar_instalacion
+            botones, text="⛏ Instalar Mods",
+            command=self.iniciar_instalacion, **btn_kwargs
         )
-        self.install_btn.grid(row=0, column=0, padx=10)
+        self.install_btn.grid(row=0, column=0, padx=6, pady=8)
 
         self.select_btn = ctk.CTkButton(
-            botones,
-            text="Seleccionar .minecraft",
-            width=220,
-            command=self.seleccionar_carpeta
+            botones, text="📁 Seleccionar .minecraft",
+            command=self.seleccionar_carpeta, **btn_kwargs
         )
-        self.select_btn.grid(row=0, column=1, padx=10)
+        self.select_btn.grid(row=0, column=1, padx=6, pady=8)
+
+        self.check_update_btn = ctk.CTkButton(
+            botones, text="🔍 Buscar actualización",
+            command=self.check_update, **btn_kwargs
+        )
+        self.check_update_btn.grid(row=0, column=2, padx=6, pady=8)
+
+        update_btn_kwargs = dict(btn_kwargs)
+        update_btn_kwargs["fg_color"] = MCColors.GRASS_TOP
+        update_btn_kwargs["hover_color"] = MCColors.GRASS_DARK
 
         self.update_btn = ctk.CTkButton(
-            botones,
-            text="Buscar actualización",
-            width=220,
-            command=self.check_update
-        )
-        self.update_btn.grid(row=0, column=2, padx=10)
-        self.update_btn = ctk.CTkButton(
-            botones,
-            text="Actualizar",
-            width=220,
+            botones, text="⬆ Actualizar",
             command=self.actualizar_app,
-            state="disabled"
+            state="disabled",
+            **update_btn_kwargs
         )
-        self.update_btn.grid(row=1, column=1, padx=10, pady=10)
+        self.update_btn.grid(row=0, column=3, padx=6, pady=8)
+
     # =========================
     # SELECCION CARPETA
     # =========================
@@ -117,7 +240,7 @@ class LauncherUI:
         self.minecraft_path = folder
         self.installer.set_custom_minecraft(folder)
 
-        self.estado.configure(text="🟡 Ruta personalizada")
+        self.estado.configure(text="🟡 Ruta personalizada", text_color=MCColors.TEXT_YELLOW)
         self.log.insert("end", f"\n📁 .minecraft seleccionado:\n{folder}\n")
 
     # =========================
@@ -147,7 +270,7 @@ class LauncherUI:
                 if latest != app_version:
                     self.update_btn.configure(state="normal")
                     self.log.insert("end", f"\n🟡 Nueva versión: {latest}\n")
-                    self.estado.configure(text="🟡 Update disponible")
+                    self.estado.configure(text="🟡 Update disponible", text_color=MCColors.TEXT_YELLOW)
 
                     messagebox.showinfo(
                         "Actualización disponible",
@@ -165,8 +288,8 @@ class LauncherUI:
                     )
 
                     self.update_btn.configure(state="disabled")
-                    self.estado.configure(text="🟢 Actualizado")
-    
+                    self.estado.configure(text="🟢 Actualizado", text_color=MCColors.TEXT_GREEN)
+
             except requests.exceptions.RequestException as e:
                 messagebox.showerror("Error de red", str(e))
 
@@ -178,7 +301,6 @@ class LauncherUI:
 
         threading.Thread(target=_check, daemon=True).start()
 
- 
     # =========================
     # THREAD FIX
     # =========================
@@ -199,6 +321,7 @@ class LauncherUI:
 
         if not carpeta:
             self.log.insert("end", "❌ Minecraft no encontrado\n")
+            self.estado.configure(text="🔴 Error", text_color=MCColors.TEXT_RED)
             return
 
         self.log.insert("end", f"📂 {carpeta}\n\n")
@@ -210,6 +333,7 @@ class LauncherUI:
 
         if not data:
             self.log.insert("end", "❌ Error cargando modpack.json\n")
+            self.estado.configure(text="🔴 Error", text_color=MCColors.TEXT_RED)
             return
 
         mods = data["mods"]
@@ -221,6 +345,7 @@ class LauncherUI:
 
         if not ok:
             self.log.insert("end", f"❌ {result}\n")
+            self.estado.configure(text="🔴 Error", text_color=MCColors.TEXT_RED)
             return
 
         # progreso visual seguro
@@ -230,7 +355,7 @@ class LauncherUI:
             self.progress.set((i + 1) / total)
             self.app.update()
 
-        self.estado.configure(text="🟢 Instalado")
+        self.estado.configure(text="🟢 Instalado", text_color=MCColors.TEXT_GREEN)
         self.log.insert("end", "\n🎉 Instalación completada\n")
 
     # =========================
@@ -238,9 +363,10 @@ class LauncherUI:
     # =========================
     def iniciar(self):
         self.app.mainloop()
+
     # =========================
     # ACTUALIZAR APP
-    # =========================    
+    # =========================
     def actualizar_app(self):
         try:
             self.log.insert("end", "\n⬇ Descargando actualización...\n")
@@ -286,4 +412,3 @@ class LauncherUI:
 
         except Exception as e:
             messagebox.showerror("Error update", str(e))
-      

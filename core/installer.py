@@ -40,18 +40,29 @@ class Installer:
         os.makedirs(mods_folder, exist_ok=True)
 
         mods = data["mods"]
-        instalados = []
-
         base_url = "https://raw.githubusercontent.com/JordiMarrufo/Mods-1.20.1/main/mods/"
+
+        # =========================
+        # 🔥 1. LIMPIAR MODS VIEJOS
+        # =========================
+        for file in os.listdir(mods_folder):
+            file_path = os.path.join(mods_folder, file)
+
+            if file.endswith(".jar"):
+                try:
+                    os.remove(file_path)
+                except Exception as e:
+                    print(f"No se pudo borrar {file}: {e}")
+
+        # =========================
+        # 🔥 2. DESCARGAR NUEVOS
+        # =========================
+        instalados = []
 
         for mod in mods:
 
             url = base_url + mod
             destino = os.path.join(mods_folder, mod)
-
-            if os.path.exists(destino):
-                instalados.append(mod)
-                continue
 
             try:
                 r = requests.get(url, stream=True, timeout=20)
