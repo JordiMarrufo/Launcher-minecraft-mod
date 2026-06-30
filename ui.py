@@ -3,7 +3,6 @@ import threading
 import requests
 import webbrowser
 import os
-import sys
 import tkinter.font as tkfont
 from core.updater import Updater
 from tkinter import filedialog, messagebox
@@ -251,8 +250,21 @@ class LauncherUI:
 
         def _check():
             try:
-                url = "https://raw.githubusercontent.com/JordiMarrufo/Launcher-minecraft-mod/main/version.json"
-                r = requests.get(url, timeout=10)
+                import time
+                # raw.githubusercontent.com cachea el contenido en su CDN
+                # durante varios minutos. Sin esto, puede devolver una
+                # versión vieja del version.json aunque el repo ya tenga
+                # la versión nueva (justo lo que te estaba pasando).
+                url = (
+                    "https://raw.githubusercontent.com/JordiMarrufo/"
+                    "Launcher-minecraft-mod/main/version.json"
+                    f"?nocache={int(time.time())}"
+                )
+                headers = {
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                }
+                r = requests.get(url, headers=headers, timeout=10)
                 r.raise_for_status()
 
                 data = r.json()
@@ -377,24 +389,10 @@ class LauncherUI:
             r = requests.get(url, stream=True)
             r.raise_for_status()
 
-            # Ruta real del .exe que se está ejecutando ahora mismo.
-            # Cuando la app está compilada con PyInstaller, sys.executable
-            # apunta exactamente a "LastHopeLauncher.exe" (con su nombre real),
-            # así que NO hay que inventar nombres como "app.exe".
-            if getattr(sys, "frozen", False):
-                current_exe = sys.executable
-            else:
-                # Si se ejecuta como script .py (modo desarrollo), simulamos
-                # la ruta que tendría el exe final para poder probar el flujo.
-                current_exe = os.path.abspath("LastHopeLauncher.exe")
+            current_exe = os.path.abspath("app.exe")
+            new_exe = os.path.abspath("app_new.exe")
 
-            exe_dir = os.path.dirname(current_exe)
-            exe_name = os.path.basename(current_exe)
-
-            # Archivo temporal de descarga, en la MISMA carpeta que el exe real.
-            new_exe = os.path.join(exe_dir, f"{exe_name}.update")
-
-            # guardar el nuevo exe descargado
+            # guardar nuevo exe
             with open(new_exe, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024 * 1024):
                     if chunk:
@@ -402,34 +400,24 @@ class LauncherUI:
 
             self.log.insert("end", "✔ Descarga completada\n")
 
-            # Script .bat que:
-            # 1. Espera a que la app actual se cierre por completo (libera el .exe)
-            # 2. Borra el exe viejo
-            # 3. Renombra el nuevo archivo descargado con el MISMO nombre original
-            # 4. Vuelve a abrir la app ya actualizada
-            # 5. Se autoelimina
-            bat_path = os.path.join(exe_dir, "update.bat")
+            # crear script de actualización
+            bat_path = os.path.abspath("update.bat")
 
             with open(bat_path, "w") as f:
-                f.write(f"""@echo off
-:wait_close
-tasklist /fi "imagename eq {exe_name}" | find /i "{exe_name}" >nul
-if not errorlevel 1 (
-    timeout /t 1 >nul
-    goto wait_close
-)
-del /f /q "{current_exe}"
-move /y "{new_exe}" "{current_exe}"
-start "" "{current_exe}"
-del "%~f0"
-""")
+                f.write(f"""
+    @echo off
+    timeout /t 2 >nul
+    move /y "{new_exe}" "{current_exe}"
+    start "" "{current_exe}"
+    del "%~f0"
+    """)
 
             messagebox.showinfo(
                 "Update listo",
                 "Se cerrará la app para actualizar."
             )
 
-            # cerrar app (libera el archivo .exe para que el .bat pueda reemplazarlo)
+            # cerrar app
             self.app.destroy()
 
             # ejecutar updater
