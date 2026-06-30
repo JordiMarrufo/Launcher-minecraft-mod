@@ -3,7 +3,7 @@ import threading
 import requests
 import webbrowser
 import os
-
+from core.updater import Updater
 from tkinter import filedialog, messagebox
 from core.installer import Installer
 
@@ -22,7 +22,7 @@ class LauncherUI:
         self.app.title("Minecraft Mod Installer")
         self.app.geometry("1000x600")
         self.app.resizable(False, False)
-
+        self.updater = Updater()
         self.minecraft_path = None
         self.installer = Installer()
 
@@ -82,7 +82,14 @@ class LauncherUI:
             command=self.check_update
         )
         self.update_btn.grid(row=0, column=2, padx=10)
-
+        self.update_btn = ctk.CTkButton(
+            botones,
+            text="Actualizar",
+            width=220,
+            command=self.actualizar_app,
+            state="disabled"
+        )
+        self.update_btn.grid(row=1, column=1, padx=10, pady=10)
     # =========================
     # SELECCION CARPETA
     # =========================
@@ -119,36 +126,59 @@ class LauncherUI:
     def check_update(self):
 
         def _check():
-
             try:
                 url = "https://raw.githubusercontent.com/JordiMarrufo/Launcher-minecraft-mod/main/version.json"
                 r = requests.get(url, timeout=10)
+                r.raise_for_status()
+
                 data = r.json()
 
-                latest = data["version"]
+                latest = str(data.get("version", "")).strip()
+                app_version = str(APP_VERSION).strip()
 
-                if latest != APP_VERSION:
+                print("APP VERSION:", app_version)
+                print("LATEST:", latest)
+                print("RAW JSON:", data)
 
+                if not latest:
+                    messagebox.showerror("Error", "No se encontró la versión en GitHub")
+                    return
+
+                if latest != app_version:
+                    self.update_btn.configure(state="normal")
                     self.log.insert("end", f"\n🟡 Nueva versión: {latest}\n")
+                    self.estado.configure(text="🟡 Update disponible")
 
                     messagebox.showinfo(
                         "Actualización disponible",
-                        f"Versión nueva: {latest}\nTu versión: {APP_VERSION}"
+                        f"Nueva versión: {latest}\nTu versión: {app_version}"
                     )
 
-                    webbrowser.open(data["url"])
+                    webbrowser.open(
+                        data.get("url", "https://github.com/JordiMarrufo/Launcher-minecraft-mod/releases/latest")
+                    )
 
                 else:
                     messagebox.showinfo(
                         "Actualización",
-                        "Ya tienes la última versión"
+                        f"Ya tienes la última versión ({app_version})"
                     )
 
+                    self.update_btn.configure(state="disabled")
+                    self.estado.configure(text="🟢 Actualizado")
+    
+            except requests.exceptions.RequestException as e:
+                messagebox.showerror("Error de red", str(e))
+
+            except ValueError:
+                messagebox.showerror("Error", "JSON inválido en version.json")
+
             except Exception as e:
-                messagebox.showerror("Error update", str(e))
+                messagebox.showerror("Error inesperado", str(e))
 
-        threading.Thread(target=_check).start()
+        threading.Thread(target=_check, daemon=True).start()
 
+ 
     # =========================
     # THREAD FIX
     # =========================
@@ -208,3 +238,38 @@ class LauncherUI:
     # =========================
     def iniciar(self):
         self.app.mainloop()
+    # =========================
+    # ACTUALIZAR APP
+    # =========================    
+    def actualizar_app(self):
+
+        try:
+            self.log.insert("end", "\n⬇ Descargando actualización...\n")
+
+            url = "https://github.com/JordiMarrufo/Launcher-minecraft-mod/releases/latest/download/app.exe"
+
+            r = requests.get(url, stream=True)
+            r.raise_for_status()
+
+            exe_path = os.path.join(os.getcwd(), "app_new.exe")
+
+            with open(exe_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        f.write(chunk)
+
+            self.log.insert("end", "✔ Descarga completada\n")
+
+            messagebox.showinfo(
+                "Update listo",
+                "Descarga completada.\nSe abrirá el nuevo launcher."
+            )
+
+            # abrir nuevo exe
+            os.startfile(exe_path)
+
+            # cerrar app actual
+            self.app.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Error update", str(e))
