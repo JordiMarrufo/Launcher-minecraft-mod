@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox
 from core.installer import Installer
 
 
-APP_VERSION = "1.0.2"  # Actualiza esta versión según corresponda
+APP_VERSION = "1.0.3"  # Actualiza esta versión según corresponda
 
 
 class LauncherUI:
@@ -19,7 +19,7 @@ class LauncherUI:
         ctk.set_default_color_theme("blue")
 
         self.app = ctk.CTk()
-        self.app.title("Minecraft Mod Installer")
+        self.app.title("Last Hope - Launcher - Mods")
         self.app.geometry("1000x600")
         self.app.resizable(False, False)
         self.updater = Updater()
@@ -242,34 +242,48 @@ class LauncherUI:
     # ACTUALIZAR APP
     # =========================    
     def actualizar_app(self):
-
         try:
             self.log.insert("end", "\n⬇ Descargando actualización...\n")
 
-            url = "https://github.com/JordiMarrufo/Launcher-minecraft-mod/releases/latest/download/app.exe"
+            url = "https://github.com/JordiMarrufo/Launcher-minecraft-mod/releases/latest/download/LastHopeLauncher.exe"
 
             r = requests.get(url, stream=True)
             r.raise_for_status()
 
-            exe_path = os.path.join(os.getcwd(), "app_new.exe")
+            current_exe = os.path.abspath("app.exe")
+            new_exe = os.path.abspath("app_new.exe")
 
-            with open(exe_path, "wb") as f:
+            # guardar nuevo exe
+            with open(new_exe, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024 * 1024):
                     if chunk:
                         f.write(chunk)
 
             self.log.insert("end", "✔ Descarga completada\n")
 
+            # crear script de actualización
+            bat_path = os.path.abspath("update.bat")
+
+            with open(bat_path, "w") as f:
+                f.write(f"""
+    @echo off
+    timeout /t 2 >nul
+    move /y "{new_exe}" "{current_exe}"
+    start "" "{current_exe}"
+    del "%~f0"
+    """)
+
             messagebox.showinfo(
                 "Update listo",
-                "Descarga completada.\nSe abrirá el nuevo launcher."
+                "Se cerrará la app para actualizar."
             )
 
-            # abrir nuevo exe
-            os.startfile(exe_path)
-
-            # cerrar app actual
+            # cerrar app
             self.app.destroy()
+
+            # ejecutar updater
+            os.startfile(bat_path)
 
         except Exception as e:
             messagebox.showerror("Error update", str(e))
+      
