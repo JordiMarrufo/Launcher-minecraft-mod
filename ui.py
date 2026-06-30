@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox
 from core.installer import Installer
 
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 
 class LauncherUI:
