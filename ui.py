@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox
 from core.installer import Installer
 
 
-APP_VERSION = "1.0.5"  # Actualiza esta versión según corresponda
+APP_VERSION = "1.0.6"  # Actualiza esta versión según corresponda
 
 
 # =====================================================
