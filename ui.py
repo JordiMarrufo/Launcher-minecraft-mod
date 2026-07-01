@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox
 from core.installer import Installer
 
 
-APP_VERSION = "1.0.6"  # Actualiza esta versión según corresponda
+APP_VERSION = "1.0.7"  # Actualiza esta versión según corresponda
 
 
 # =====================================================
@@ -231,12 +231,9 @@ class LauncherUI:
 
         mods_path = os.path.join(folder, "mods")
 
-        if not os.path.exists(mods_path):
-            messagebox.showwarning(
-                "Carpeta incorrecta",
-                "No parece ser .minecraft (falta carpeta mods)"
-            )
-            return
+        # Sin validaciones: el usuario elige la carpeta que quiera y ahí se
+        # instala. Si "mods" no existe dentro, se crea automáticamente.
+        os.makedirs(mods_path, exist_ok=True)
 
         self.minecraft_path = folder
         self.installer.set_custom_minecraft(folder)
